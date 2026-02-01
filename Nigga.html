@@ -214,6 +214,9 @@
         }
 
         /* yes 靠左、no 靠右，愿意按钮用包装固定占位，hover 时不位移 */
+        :root {
+            --yes-max-scale: 1.3;
+        }
         .buttons {
             margin-top: 24px;
             display: flex;
@@ -253,6 +256,8 @@
             background-color: #999;
             color: white;
             transition: left 0.3s ease-out, top 0.3s ease-out, transform 0.3s ease-out;
+            transform: scale(var(--yes-max-scale));
+            transform-origin: center;
         }
         /* 随着点「不」次数增加，愿意按钮逐渐变大（暗示只有这一个选择） */
         .yes-btn-wrap.yes-scale-1 #yesBtn { transform: scale(1); }
@@ -260,7 +265,7 @@
         .yes-btn-wrap.yes-scale-3 #yesBtn { transform: scale(1.12); }
         .yes-btn-wrap.yes-scale-4 #yesBtn { transform: scale(1.18); }
         .yes-btn-wrap.yes-scale-5 #yesBtn { transform: scale(1.24); }
-        .yes-btn-wrap.yes-scale-6 #yesBtn { transform: scale(1.3); }
+        .yes-btn-wrap.yes-scale-6 #yesBtn { transform: scale(var(--yes-max-scale)); }
 
         /* 强制执行彩蛋：变成「愿意」的 no 按钮，与愿意按钮一样大 */
         #noBtn.became-yes,
@@ -268,24 +273,37 @@
             background-color: #ff4d94 !important;
             color: white !important;
             cursor: pointer;
-            transform: scale(1.3);
+            transform: scale(var(--yes-max-scale));
             transform-origin: right center;
         }
         .buttons.double-yes {
             justify-content: center;
             max-width: 560px;
-            gap: 24px;
+            gap: 32px;
         }
         .buttons.double-yes #yesBtn,
         .buttons.double-yes #noBtn.became-yes {
-            transform: scale(1.05);
+            transform: scale(var(--yes-max-scale));
         }
 
         /* 点 yes 后的成功页：小人开心 + 同一段文案 */
         .success-view .buttons,
         .success-view .success-hide { display: none !important; }
-        .success-view .character-box { padding-bottom: 24px; }
-        .success-view .character { margin-bottom: 8px; }
+        .success-view .character-box {
+            padding-bottom: 24px;
+            border: none;
+            background-image: none;
+            box-shadow: none;
+            width: auto;
+            height: auto;
+        }
+        .success-view .character {
+            margin-bottom: 8px;
+            transform: scale(1.8);
+        }
+        .success-view .speech-bubble {
+            display: none;
+        }
         .success-msg {
             color: #d63384;
             font-size: 1.5rem;
@@ -343,6 +361,7 @@
         const heartCanvas = document.getElementById('heartCanvas');
 
         let noHoverCount = 0;
+        const maxYesScale = 1.3;
         const scales = [1, 0.88, 0.75, 0.62, 0.5, 0.4, 0.32, 0.26];
 
         // 对话泡文案：按 noHoverCount 取最高匹配
@@ -375,6 +394,8 @@
             mainTitle.textContent = 'Love You Forever! ❤️';
             character.classList.remove('scared', 'very-scared');
             successMsg.style.display = 'block';
+            speechBubble.classList.remove('visible');
+            noZone.style.transform = '';
             heartBurst();
         }
 
@@ -386,7 +407,7 @@
             if (noHoverCount >= 10) {
                 noBtn.textContent = '好吧我也愿意';
                 noBtn.style.backgroundColor = '#ff4d94';
-                noBtn.style.transform = '';
+                noBtn.style.transform = `scale(${maxYesScale})`;
                 noBtn.style.position = '';
                 noBtn.style.left = '';
                 noBtn.style.top = '';
@@ -400,18 +421,19 @@
             }
 
             const scale = scales[Math.min(noHoverCount - 1, scales.length - 1)] || scales[scales.length - 1];
-            const w = noBtn.offsetWidth * scale;
-            const h = noBtn.offsetHeight * scale;
-            const zone = noZone.getBoundingClientRect();
+            const w = noBtn.offsetWidth * scale * maxYesScale;
+            const h = noBtn.offsetHeight * scale * maxYesScale;
+            const zoneWidth = noZone.clientWidth;
+            const zoneHeight = noZone.clientHeight;
             const padding = 12;
             // 避开小人脸和对话泡：只在左右两侧 + 下半区随机
             const avoidCenterW = 0.5;
             const avoidTopH = 0.45;
-            const leftMaxX = zone.width * (1 - avoidCenterW) / 2 - padding - w;
-            const rightMinX = zone.width * (1 + avoidCenterW) / 2;
-            const rightMaxX = zone.width - padding - w;
-            const minY = zone.height * avoidTopH;
-            const maxYVal = zone.height - padding - h - minY;
+            const leftMaxX = zoneWidth * (1 - avoidCenterW) / 2 - padding - w;
+            const rightMinX = zoneWidth * (1 + avoidCenterW) / 2;
+            const rightMaxX = zoneWidth - padding - w;
+            const minY = zoneHeight * avoidTopH;
+            const maxYVal = zoneHeight - padding - h - minY;
             if (maxYVal <= 0) return;
             const y = minY + Math.random() * maxYVal;
             let x;
@@ -426,13 +448,16 @@
             } else if (rightMaxX - rightMinX > 0) {
                 x = rightMinX + Math.random() * (rightMaxX - rightMinX);
             } else {
-                x = padding + Math.random() * Math.max(0, zone.width - padding * 2 - w);
+                x = padding + Math.random() * Math.max(0, zoneWidth - padding * 2 - w);
             }
 
-            noBtn.style.position = 'fixed';
-            noBtn.style.left = x + 'px';
-            noBtn.style.top = y + 'px';
-            noBtn.style.transform = `scale(${scale})`;
+            const clampedX = Math.max(padding, Math.min(x, zoneWidth - w - padding));
+            const clampedY = Math.max(padding, Math.min(y, zoneHeight - h - padding));
+
+            noBtn.style.position = 'absolute';
+            noBtn.style.left = clampedX + 'px';
+            noBtn.style.top = clampedY + 'px';
+            noBtn.style.transform = `scale(${scale * maxYesScale})`;
 
             character.classList.remove('scared', 'very-scared');
             if (noHoverCount >= 2) character.classList.add('scared');
