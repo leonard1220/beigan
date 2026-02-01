@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Be My Valentine?</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Arial', sans-serif;
+            background-color: #ffeef8;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        .container { text-align: center; }
+        h1 { color: #d63384; font-size: 3rem; margin-bottom: 0.5rem; }
+
+        /* 方框：网格 + 随鼠标微弱透视扭曲 */
+        .character-box {
+            width: 640px;
+            height: 380px;
+            margin: 20px auto;
+            position: relative;
+            border: 3px solid #d63384;
+            border-radius: 16px;
+            background-image:
+                linear-gradient(rgba(214,51,132,0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(214,51,132,0.08) 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.15s ease-out;
+            transform-style: preserve-3d;
+            overflow: hidden;
+        }
+
+        /* 互动对话泡：小人头顶 */
+        .speech-bubble {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            padding: 12px 20px;
+            background: #fff;
+            border: 2px solid #d63384;
+            border-radius: 16px;
+            font-size: 0.95rem;
+            color: #333;
+            max-width: 380px;
+            min-width: 180px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(214,51,132,0.2);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -8px;
+            border: 8px solid transparent;
+            border-top-color: #fff;
+            filter: drop-shadow(0 2px 0 #d63384);
+        }
+        .speech-bubble.visible {
+            opacity: 1;
+            animation: bubble-pop 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        @keyframes bubble-pop {
+            0% { transform: translateX(-50%) translateY(-8px) scale(0.8); opacity: 0; }
+            100% { transform: translateX(-50%) translateY(-8px) scale(1); opacity: 1; }
+        }
+
+        .character {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+            position: relative;
+        }
+        .character .face {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(160deg, #ffe4c4 0%, #ffd4a8 40%, #f5c98a 100%);
+            border-radius: 50%;
+            position: relative;
+            box-shadow:
+                inset 2px 2px 12px rgba(255,220,180,0.8),
+                inset -2px -4px 10px rgba(0,0,0,0.06),
+                2px 4px 14px rgba(0,0,0,0.12);
+            transition: box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        /* 开心：眼睛带一点弯弯的笑眼感 + 高光 */
+        .character .eye {
+            width: 11px;
+            height: 11px;
+            background: #2a2a2a;
+            border-radius: 50%;
+            position: absolute;
+            top: 28px;
+            transition: all 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+            box-shadow: inset -2px -2px 2px rgba(0,0,0,0.2);
+        }
+        .character .eye::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: opacity 0.3s ease;
+        }
+        .character .eye.left { left: 17px; }
+        .character .eye.right { right: 17px; }
+        /* 嘴巴 - 幸福笑，弧度更柔和 */
+        .character .mouth {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            margin-left: -15px;
+            width: 30px;
+            height: 14px;
+            border: 2.5px solid #2a2a2a;
+            border-top: none;
+            border-radius: 0 0 30px 30px;
+            transition: all 0.4s cubic-bezier(0.34, 1.2, 0.64, 1);
+            box-sizing: border-box;
+        }
+        /* 惊恐：眉毛上扬、眼睛瞪大、嘴巴 O + 轻微抖动 */
+        .character .face::before,
+        .character .face::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 3px;
+            background: #2a2a2a;
+            border-radius: 2px;
+            top: 20px;
+            transition: all 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+            opacity: 0;
+        }
+        .character .face::before { left: 12px; transform: rotate(-12deg); }
+        .character .face::after { right: 12px; transform: rotate(12deg); }
+        .character.scared .face::before,
+        .character.scared .face::after,
+        .character.very-scared .face::before,
+        .character.very-scared .face::after {
+            opacity: 1;
+            top: 16px;
+        }
+        .character.scared .face::before { transform: rotate(-25deg); }
+        .character.scared .face::after { transform: rotate(25deg); }
+        .character.very-scared .face::before { transform: rotate(-28deg); }
+        .character.very-scared .face::after { transform: rotate(28deg); }
+        .character.scared .eye::after,
+        .character.very-scared .eye::after { opacity: 0.3; }
+        .character.scared .eye {
+            width: 14px;
+            height: 14px;
+            top: 26px;
+            left: 14px;
+            right: auto;
+            border-radius: 50%;
+        }
+        .character.scared .eye.right { left: auto; right: 14px; }
+        .character.scared .mouth {
+            width: 18px;
+            height: 18px;
+            margin-left: -9px;
+            bottom: 17px;
+            border: 2.5px solid #2a2a2a;
+            border-radius: 50%;
+            background: transparent;
+            animation: mouth-wobble 0.6s ease-in-out infinite;
+        }
+        .character.very-scared .eye {
+            width: 16px;
+            height: 16px;
+            top: 24px;
+            left: 12px;
+            right: auto;
+        }
+        .character.very-scared .eye.right { left: auto; right: 12px; }
+        .character.very-scared .mouth {
+            width: 20px;
+            height: 20px;
+            margin-left: -10px;
+            bottom: 15px;
+            animation: mouth-wobble 0.4s ease-in-out infinite;
+        }
+        .character.very-scared .face {
+            animation: face-shake 0.15s ease-in-out infinite;
+        }
+        @keyframes mouth-wobble {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        @keyframes face-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-1px); }
+            75% { transform: translateX(1px); }
+        }
+
+        /* yes 靠左、no 靠右，愿意按钮用包装固定占位，hover 时不位移 */
+        .buttons {
+            margin-top: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 480px;
+            padding: 0 24px;
+            box-sizing: border-box;
+        }
+        .yes-btn-wrap {
+            display: inline-flex;
+            justify-content: flex-start;
+            flex-shrink: 0;
+        }
+        button {
+            padding: 20px 40px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            border-radius: 12px;
+            border: none;
+            transition: transform 0.25s ease, background-color 0.2s;
+            font-weight: bold;
+        }
+        #yesBtn {
+            background-color: #ff4d94;
+            color: white;
+            transform-origin: left center;
+            display: inline-block;
+        }
+        #yesBtn:hover {
+            background-color: #ff6b9d;
+            transform: scale(1.2) !important;
+        }
+        #noBtn {
+            background-color: #999;
+            color: white;
+            transition: left 0.3s ease-out, top 0.3s ease-out, transform 0.3s ease-out;
+        }
+        /* 随着点「不」次数增加，愿意按钮逐渐变大（暗示只有这一个选择） */
+        .yes-btn-wrap.yes-scale-1 #yesBtn { transform: scale(1); }
+        .yes-btn-wrap.yes-scale-2 #yesBtn { transform: scale(1.06); }
+        .yes-btn-wrap.yes-scale-3 #yesBtn { transform: scale(1.12); }
+        .yes-btn-wrap.yes-scale-4 #yesBtn { transform: scale(1.18); }
+        .yes-btn-wrap.yes-scale-5 #yesBtn { transform: scale(1.24); }
+        .yes-btn-wrap.yes-scale-6 #yesBtn { transform: scale(1.3); }
+
+        /* 强制执行彩蛋：变成「愿意」的 no 按钮，与愿意按钮一样大 */
+        #noBtn.became-yes,
+        button.became-yes {
+            background-color: #ff4d94 !important;
+            color: white !important;
+            cursor: pointer;
+            transform: scale(1.3);
+            transform-origin: right center;
+        }
+
+        /* 点 yes 后的成功页：小人开心 + 同一段文案 */
+        .success-view .buttons,
+        .success-view .success-hide { display: none !important; }
+        .success-view .character-box { padding-bottom: 24px; }
+        .success-view .character { margin-bottom: 8px; }
+        .success-msg {
+            color: #d63384;
+            font-size: 1.5rem;
+            margin-top: 12px;
+        }
+
+        /* 爱心粒子画布 */
+        #heartCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="mainContainer">
+        <h1 id="mainTitle">你愿意被我干吗？ ❤️</h1>
+        <div class="character-box" id="noZone">
+            <div class="character" id="character">
+                <div class="speech-bubble" id="speechBubble"></div>
+                <div class="face">
+                    <span class="eye left"></span>
+                    <span class="eye right"></span>
+                    <span class="mouth"></span>
+                </div>
+            </div>
+            <div class="buttons success-hide" id="buttonsRow">
+                <span class="yes-btn-wrap yes-scale-1" id="yesBtnWrap"><button id="yesBtn">愿意！</button></span>
+                <button id="noBtn">不愿意</button>
+            </div>
+        </div>
+        <p class="success-msg" id="successMsg" style="display: none;">我就知道你会答应的！😘</p>
+    </div>
+
+    <canvas id="heartCanvas" aria-hidden="true"></canvas>
+    <audio id="bgm" muted loop preload="auto" src="https://assets.mixkit.co/music/preview/mixkit-bossa-nova-217.mp3"></audio>
+
+    <script>
+        const noBtn = document.getElementById('noBtn');
+        const yesBtn = document.getElementById('yesBtn');
+        const yesBtnWrap = document.getElementById('yesBtnWrap');
+        const character = document.getElementById('character');
+        const noZone = document.getElementById('noZone');
+        const mainTitle = document.getElementById('mainTitle');
+        const mainContainer = document.getElementById('mainContainer');
+        const successMsg = document.getElementById('successMsg');
+        const speechBubble = document.getElementById('speechBubble');
+        const bgm = document.getElementById('bgm');
+        const heartCanvas = document.getElementById('heartCanvas');
+
+        let noHoverCount = 0;
+        const scales = [1, 0.88, 0.75, 0.62, 0.5, 0.4, 0.32, 0.26];
+
+        // 对话泡文案：按 noHoverCount 取最高匹配
+        const speechTexts = [
+            { min: 1, text: '哎？你点错了。' },
+            { min: 3, text: '别闹，快点左边！' },
+            { min: 5, text: '你居然真的想拒绝我？(T_T)' },
+            { min: 8, text: '由于你太调皮，「不」按钮决定物理缩小...' }
+        ];
+        function updateSpeechBubble() {
+            let msg = '';
+            for (let i = speechTexts.length - 1; i >= 0; i--) {
+                if (noHoverCount >= speechTexts[i].min) {
+                    msg = speechTexts[i].text;
+                    break;
+                }
+            }
+            if (msg) {
+                speechBubble.textContent = msg;
+                speechBubble.classList.remove('visible');
+                speechBubble.offsetHeight;
+                speechBubble.classList.add('visible');
+            } else {
+                speechBubble.classList.remove('visible');
+            }
+        }
+
+        function triggerSuccess() {
+            mainContainer.classList.add('success-view');
+            mainTitle.textContent = 'Love You Forever! ❤️';
+            character.classList.remove('scared', 'very-scared');
+            successMsg.style.display = 'block';
+            heartBurst();
+        }
+
+        function moveNoButton() {
+            if (noBtn.classList.contains('became-yes')) return;
+            noHoverCount++;
+
+            // 强制执行彩蛋：达到 10 次后「不愿意」变成「愿意」
+            if (noHoverCount >= 10) {
+                noBtn.textContent = '好吧我也愿意';
+                noBtn.style.backgroundColor = '#ff4d94';
+                noBtn.style.transform = '';
+                noBtn.style.position = '';
+                noBtn.style.left = '';
+                noBtn.style.top = '';
+                noBtn.classList.add('became-yes');
+                character.classList.remove('scared', 'very-scared');  // 小人变回开心
+                speechBubble.textContent = '嘿嘿，没得选啦~';
+                speechBubble.classList.add('visible');
+                return;
+            }
+
+            const scale = scales[Math.min(noHoverCount - 1, scales.length - 1)] || scales[scales.length - 1];
+            const w = noBtn.offsetWidth * scale;
+            const h = noBtn.offsetHeight * scale;
+            const zone = noZone.getBoundingClientRect();
+            const padding = 12;
+            // 避开小人脸和对话泡：只在左右两侧 + 下半区随机
+            const avoidCenterW = 0.5;
+            const avoidTopH = 0.45;
+            const leftMaxX = zone.width * (1 - avoidCenterW) / 2 - padding - w;
+            const rightMinX = zone.width * (1 + avoidCenterW) / 2;
+            const rightMaxX = zone.width - padding - w;
+            const minY = zone.height * avoidTopH;
+            const maxYVal = zone.height - padding - h - minY;
+            if (maxYVal <= 0) return;
+            const y = minY + Math.random() * maxYVal;
+            let x;
+            if (leftMaxX > 0 && (rightMaxX - rightMinX) > 0) {
+                if (Math.random() < 0.5) {
+                    x = padding + Math.random() * leftMaxX;
+                } else {
+                    x = rightMinX + Math.random() * (rightMaxX - rightMinX);
+                }
+            } else if (leftMaxX > 0) {
+                x = padding + Math.random() * leftMaxX;
+            } else if (rightMaxX - rightMinX > 0) {
+                x = rightMinX + Math.random() * (rightMaxX - rightMinX);
+            } else {
+                x = padding + Math.random() * Math.max(0, zone.width - padding * 2 - w);
+            }
+
+            noBtn.style.position = 'fixed';
+            noBtn.style.left = x + 'px';
+            noBtn.style.top = y + 'px';
+            noBtn.style.transform = `scale(${scale})`;
+
+            character.classList.remove('scared', 'very-scared');
+            if (noHoverCount >= 2) character.classList.add('scared');
+            if (noHoverCount >= 4) character.classList.add('very-scared');
+
+            const yesScaleClass = 'yes-scale-' + Math.min(noHoverCount, 6);
+            yesBtnWrap.className = 'yes-btn-wrap ' + yesScaleClass;
+
+            updateSpeechBubble();
+        }
+
+        noBtn.addEventListener('mouseover', moveNoButton);
+        noBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            moveNoButton();
+        }, { passive: false });
+
+        noBtn.addEventListener('click', (e) => {
+            if (noBtn.classList.contains('became-yes')) {
+                e.preventDefault();
+                triggerSuccess();
+            }
+        });
+
+        yesBtn.addEventListener('click', () => { triggerSuccess(); });
+
+        // 爱心粒子爆炸（纯 Canvas，无依赖）
+        function heartBurst() {
+            const ctx = heartCanvas.getContext('2d');
+            heartCanvas.width = window.innerWidth;
+            heartCanvas.height = window.innerHeight;
+            const hearts = [];
+            const count = 80;
+            const centerX = heartCanvas.width / 2;
+            const centerY = heartCanvas.height / 2;
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 * i) / count + Math.random() * 2;
+                const speed = 4 + Math.random() * 8;
+                hearts.push({
+                    x: centerX, y: centerY,
+                    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 2,
+                    size: 8 + Math.random() * 16, life: 1, rot: Math.random() * 6 - 3
+                });
+            }
+            function drawHeart(ctx, x, y, s) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.scale(s / 5, s / 5);
+                ctx.fillStyle = '#ff4d94';
+                ctx.beginPath();
+                ctx.moveTo(0, -0.5);
+                ctx.bezierCurveTo(1.2, -0.5, 1.2, 0.8, 0, 1.5);
+                ctx.bezierCurveTo(-1.2, 0.8, -1.2, -0.5, 0, -0.5);
+                ctx.fill();
+                ctx.restore();
+            }
+            let raf;
+            function tick() {
+                ctx.clearRect(0, 0, heartCanvas.width, heartCanvas.height);
+                let alive = false;
+                hearts.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    p.vy += 0.15;
+                    p.life -= 0.012;
+                    p.rot *= 0.98;
+                    if (p.life > 0) {
+                        alive = true;
+                        ctx.save();
+                        ctx.globalAlpha = p.life;
+                        ctx.translate(p.x, p.y);
+                        ctx.rotate(p.rot);
+                        drawHeart(ctx, 0, 0, p.size);
+                        ctx.restore();
+                    }
+                });
+                if (alive) raf = requestAnimationFrame(tick);
+                else {
+                    cancelAnimationFrame(raf);
+                    ctx.clearRect(0, 0, heartCanvas.width, heartCanvas.height);
+                }
+            }
+            tick();
+        }
+
+        // BGM：首次点击页面后播放（初始静音）
+        let bgmStarted = false;
+        function tryStartBgm() {
+            if (bgmStarted) return;
+            bgmStarted = true;
+            bgm.muted = false;
+            bgm.play().catch(() => {});
+        }
+        document.body.addEventListener('click', tryStartBgm, { once: true });
+        document.body.addEventListener('touchstart', tryStartBgm, { once: true, passive: true });
+
+        // 网格随鼠标微弱透视
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 2;
+            const y = (e.clientY / window.innerHeight - 0.5) * 2;
+            const rotY = x * 4;
+            const rotX = -y * 4;
+            noZone.style.transform = `perspective(800px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+        });
+    </script>
+</body>
+</html>
